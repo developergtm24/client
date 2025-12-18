@@ -1,0 +1,553 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Immersive Gallery</title>
+    <style>
+        /* --- RESET & VARIABLES --- */
+        :root {
+            /* Palette */
+            --bg-color: #0f0f11;
+            --text-main: #ffffff;
+            --text-muted: #a1a1aa;
+            --accent-glow: rgba(255, 255, 255, 0.6);
+            --glass-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            
+            /* Typography */
+            --font-ui: 'Inter', system-ui, sans-serif;
+            --font-serif: 'Georgia', 'Times New Roman', serif; /* Romantic feel */
+            
+            /* Animation */
+            --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none; /* Prevent text selection for app-like feel */
+        }
+
+        body {
+            font-family: var(--font-ui);
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            height: 100vh;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        /* --- BACKGROUND LAYER --- */
+        #background-layer {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: -1;
+            overflow: hidden;
+        }
+
+        #bg-video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            min-width: 100%;
+            min-height: 100%;
+            width: auto;
+            height: auto;
+            object-fit: cover;
+            opacity: 0;
+            transition: opacity 1.5s var(--ease-smooth), filter 1.5s var(--ease-smooth);
+            filter: blur(20px); /* Start blurred */
+        }
+
+        #bg-video.active {
+            opacity: 0.6; /* Dimmed slightly for text readability */
+            filter: blur(0px); /* Clear focus on active */
+        }
+        
+        /* Specific blur for lyrics mode to make text pop */
+        #bg-video.lyrics-mode {
+            filter: blur(8px) brightness(0.7);
+        }
+
+        /* Gradient Overlay for atmosphere */
+        .overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(circle at center, transparent 0%, #000000 90%);
+            z-index: 0;
+            pointer-events: none;
+        }
+
+        /* --- VIEWS CONTAINER --- */
+        .view-container {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: opacity 0.8s var(--ease-smooth), transform 0.8s var(--ease-smooth);
+            z-index: 10;
+        }
+
+        /* Utility classes for view switching */
+        .hidden {
+            opacity: 0;
+            pointer-events: none;
+            transform: scale(1.05); /* Slight zoom out effect on hide */
+        }
+
+        .active-view {
+            opacity: 1;
+            pointer-events: all;
+            transform: scale(1);
+        }
+
+        /* --- GALLERY VIEW --- */
+        .gallery-title {
+            font-family: var(--font-serif);
+            font-size: 4rem;
+            font-weight: 300;
+            letter-spacing: 0.2em;
+            text-transform: uppercase;
+            margin-bottom: 4rem;
+            opacity: 0;
+            animation: slideDownFade 1s 0.2s forwards var(--ease-smooth);
+            text-shadow: 0 0 20px rgba(255,255,255,0.3);
+        }
+
+        .cards-wrapper {
+            display: flex;
+            gap: 3rem;
+            perspective: 1000px;
+        }
+
+        .project-card {
+            width: 220px;
+            height: 320px;
+            background: var(--glass-bg);
+            border: 1px solid var(--glass-border);
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            backdrop-filter: blur(10px);
+            transition: all 0.5s var(--ease-smooth);
+            position: relative;
+            overflow: hidden;
+            opacity: 0; /* For entry animation */
+            animation: slideUpFade 1s forwards var(--ease-smooth);
+        }
+        
+        /* Stagger entry animation */
+        .project-card:nth-child(1) { animation-delay: 0.4s; }
+        .project-card:nth-child(2) { animation-delay: 0.6s; }
+
+        .project-card span {
+            font-family: var(--font-ui);
+            font-size: 1.2rem;
+            letter-spacing: 0.1em;
+            color: var(--text-main);
+            z-index: 2;
+            transition: transform 0.3s;
+        }
+
+        /* Card Hover Effects */
+        .project-card:hover {
+            background: rgba(255, 255, 255, 0.1);
+            border-color: rgba(255, 255, 255, 0.4);
+            transform: translateY(-10px) rotateX(5deg);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.4), 0 0 20px var(--accent-glow);
+        }
+        
+        .project-card:hover span {
+            transform: scale(1.1);
+            text-shadow: 0 0 10px white;
+        }
+
+        /* --- PROJECT VIEW (IMMERSIVE) --- */
+        #project-view {
+            text-align: center;
+        }
+
+        #lyrics-container {
+            width: 80%;
+            max-width: 700px;
+            min-height: 200px; /* Reserve space */
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            margin-bottom: 3rem;
+        }
+
+        .lyric-line {
+            font-family: var(--font-serif);
+            font-size: 2rem;
+            line-height: 1.5;
+            color: var(--text-main);
+            text-shadow: 0 2px 10px rgba(0,0,0,0.8);
+            margin-bottom: 1rem;
+            opacity: 0; /* Fade in handled by JS */
+            transform: translateY(10px);
+            transition: opacity 1s, transform 1s;
+        }
+        
+        .lyric-line.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        /* Typewriter Cursor Effect */
+        .cursor::after {
+            content: '|';
+            display: inline-block;
+            margin-left: 2px;
+            animation: blink 1s infinite;
+        }
+
+        /* Controls */
+        .controls {
+            display: flex;
+            gap: 1.5rem;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 15px 30px;
+            border-radius: 50px;
+            backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.1);
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.5s;
+        }
+        
+        #project-view.active-view .controls {
+            opacity: 1;
+            transform: translateY(0);
+            transition-delay: 0.5s;
+        }
+
+        .btn-control {
+            background: none;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            cursor: pointer;
+            transition: color 0.3s, text-shadow 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-control:hover {
+            color: white;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+
+        /* --- ANIMATIONS --- */
+        @keyframes slideDownFade {
+            from { opacity: 0; transform: translateY(-30px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes slideUpFade {
+            from { opacity: 0; transform: translateY(50px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes blink {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0; }
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        /* --- RESPONSIVE --- */
+        @media (max-width: 768px) {
+            .gallery-title { font-size: 2.5rem; }
+            .cards-wrapper { flex-direction: column; gap: 1.5rem; }
+            .project-card { width: 260px; height: 180px; }
+            .lyric-line { font-size: 1.4rem; }
+            #lyrics-container { width: 90%; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Background Layer -->
+    <div id="background-layer">
+        <div class="overlay"></div>
+        <!-- Video element is persistent but source changes -->
+        <video id="bg-video" loop muted playsinline></video>
+    </div>
+
+    <!-- View 1: Gallery -->
+    <section id="gallery-view" class="view-container active-view">
+        <h1 class="gallery-title">Gallery</h1>
+        <div class="cards-wrapper">
+            <!-- Project 1: Note (The main interaction) -->
+            <div class="project-card" onclick="openProject('note')">
+                <span>[note]</span>
+            </div>
+            <!-- Project 2: Birthday (Visual demo) -->
+            <div class="project-card" onclick="openProject('birthday')">
+                <span>[birthday]</span>
+            </div>
+        </div>
+    </section>
+
+    <!-- View 2: Immersive Project -->
+    <section id="project-view" class="view-container hidden">
+        <div id="lyrics-container">
+            <!-- Lyrics will be injected here via JS -->
+        </div>
+
+        <div class="controls">
+            <button class="btn-control" onclick="togglePlay()">
+                <span id="play-icon">II</span> Play/Pause
+            </button>
+            <button class="btn-control" onclick="restartProject()">
+                &#x21bb; Restart
+            </button>
+            <button class="btn-control" onclick="closeProject()">
+                &times; Close
+            </button>
+        </div>
+    </section>
+
+    <!-- Audio Element (Hidden) -->
+    <!-- Using a copyright-free romantic piano track placeholder -->
+    <audio id="audio-player"></audio>
+
+    <script>
+        /* --- CONFIGURATION & DATA --- */
+        
+        // Lyrics Data: Array of strings. 
+        // Can be customized. The typing engine handles them sequentially.
+        const lyricsData = [
+            "In the quiet of the night...",
+            "When the world falls asleep,",
+            "I find myself thinking of you.",
+            "Every memory, a soft glow,",
+            "Guiding me home.",
+            "Forever yours."
+        ];
+
+        // Assets
+        const assets = {
+            note: {
+                video: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4", // Cinematic placeholder
+                // UPDATED Audio link to a reliable source
+                audio: "https://drive.google.com/file/d/1a1u79T1zwL51C8eaX1ac_HaHA5cAaXEH/view?usp=drive_link" 
+            },
+            birthday: {
+                video: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+                audio: "https://drive.google.com/file/d/1a1u79T1zwL51C8eaX1ac_HaHA5cAaXEH/view?usp=drive_link" // No audio for birthday demo
+            }
+        };
+
+        /* --- STATE MANAGEMENT --- */
+        let isTyping = false;
+        let typingTimeouts = []; // To store timeouts for cancelling
+        let currentProject = null;
+
+        /* --- DOM ELEMENTS --- */
+        const galleryView = document.getElementById('gallery-view');
+        const projectView = document.getElementById('project-view');
+        const bgVideo = document.getElementById('bg-video');
+        const audioPlayer = document.getElementById('audio-player');
+        const lyricsContainer = document.getElementById('lyrics-container');
+        const playIcon = document.getElementById('play-icon');
+
+        /* --- CORE FUNCTIONS --- */
+
+        function openProject(projectId) {
+            currentProject = projectId;
+            const asset = assets[projectId];
+
+            // 1. Transition Views
+            galleryView.classList.remove('active-view');
+            galleryView.classList.add('hidden');
+            
+            setTimeout(() => {
+                projectView.classList.remove('hidden');
+                projectView.classList.add('active-view');
+            }, 600); // Sync with CSS transition
+
+            // 2. Update Background
+            bgVideo.src = asset.video;
+            bgVideo.play();
+            bgVideo.classList.add('active');
+            
+            // 3. Project Specific Logic
+            if (projectId === 'note') {
+                bgVideo.classList.add('lyrics-mode'); // Add extra blur
+                audioPlayer.src = asset.audio;
+                audioPlayer.volume = 0.5;
+                
+                // Play audio and start lyrics
+                const playPromise = audioPlayer.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        // Automatic playback started!
+                        playIcon.innerText = "II"; // Show pause icon
+                        startLyricsSequence();
+                    })
+                    .catch(error => {
+                        // Auto-play was prevented.
+                        console.log("Autoplay prevented. User interaction needed.");
+                        playIcon.innerText = "▶"; // Show play icon so user knows to click
+                    });
+                }
+                
+            } else {
+                // Generic logic for other projects
+                lyricsContainer.innerHTML = `<div class="lyric-line visible" style="font-size:1rem; opacity:0.8;">(Visual Demo Only)</div>`;
+            }
+        }
+
+        function closeProject() {
+            // 1. Stop Media
+            audioPlayer.pause();
+            audioPlayer.currentTime = 0;
+            bgVideo.pause();
+            bgVideo.classList.remove('active', 'lyrics-mode');
+
+            // 2. Stop Animations
+            stopLyricsSequence();
+            lyricsContainer.innerHTML = '';
+
+            // 3. Transition Views
+            projectView.classList.remove('active-view');
+            projectView.classList.add('hidden');
+
+            setTimeout(() => {
+                galleryView.classList.remove('hidden');
+                galleryView.classList.add('active-view');
+                currentProject = null;
+            }, 600);
+        }
+
+        function togglePlay() {
+            if (audioPlayer.paused) {
+                const playPromise = audioPlayer.play();
+                if (playPromise !== undefined) {
+                    playPromise.then(_ => {
+                        playIcon.innerText = "II";
+                        // Resume lyrics typing if logic allows (simplified here)
+                        if(lyricsContainer.innerHTML === "") startLyricsSequence();
+                    })
+                    .catch(error => {
+                        console.error("Playback failed:", error);
+                    });
+                }
+            } else {
+                audioPlayer.pause();
+                playIcon.innerText = "▶";
+            }
+        }
+
+        function restartProject() {
+            // Reset Audio
+            audioPlayer.currentTime = 0;
+            if (audioPlayer.paused) {
+                 audioPlayer.play().then(() => {
+                     playIcon.innerText = "II";
+                 }).catch(e => console.error(e));
+            } else {
+                 playIcon.innerText = "II";
+            }
+            
+            // Reset Lyrics
+            stopLyricsSequence();
+            lyricsContainer.innerHTML = '';
+            startLyricsSequence();
+        }
+
+        /* --- LYRICS ENGINE --- */
+
+        function startLyricsSequence() {
+            if (currentProject !== 'note') return;
+            
+            lyricsContainer.innerHTML = ''; // Clear existing
+            let globalDelay = 1000; // Initial delay before first line
+
+            lyricsData.forEach((line, index) => {
+                // Calculate timing based on index (Simple simulation of rhythm)
+                // In a real app, you'd map these to specific timestamps
+                const lineDelay = globalDelay + (index * 4000); // 4 seconds per line roughly
+
+                const timeoutId = setTimeout(() => {
+                    typeLine(line);
+                }, lineDelay);
+
+                typingTimeouts.push(timeoutId);
+            });
+        }
+
+        function typeLine(text) {
+            // Create container for the line
+            const lineEl = document.createElement('div');
+            lineEl.className = 'lyric-line';
+            lyricsContainer.appendChild(lineEl);
+
+            let charIndex = 0;
+            lineEl.classList.add('visible'); // Fade in the container first
+            
+            // Add cursor
+            lineEl.classList.add('cursor');
+
+            function typeChar() {
+                if (charIndex < text.length) {
+                    lineEl.textContent += text.charAt(charIndex);
+                    charIndex++;
+                    // Random typing speed for realism (50ms - 100ms)
+                    const speed = Math.random() * 50 + 50;
+                    const typeTimeout = setTimeout(typeChar, speed);
+                    typingTimeouts.push(typeTimeout);
+                } else {
+                    // Remove cursor when line is done
+                    lineEl.classList.remove('cursor');
+                }
+            }
+
+            typeChar();
+            
+            // Auto scroll if container gets too full
+            lyricsContainer.scrollTop = lyricsContainer.scrollHeight;
+        }
+
+        function stopLyricsSequence() {
+            // Clear all scheduled timeouts to stop the engine
+            typingTimeouts.forEach(id => clearTimeout(id));
+            typingTimeouts = [];
+        }
+
+        /* --- BACKGROUND LOOP FIX --- */
+        // Ensure seamless looping without black frames
+        bgVideo.addEventListener('ended', () => {
+            bgVideo.currentTime = 0;
+            bgVideo.play();
+        });
+
+    </script>
+</body>
+</html>
